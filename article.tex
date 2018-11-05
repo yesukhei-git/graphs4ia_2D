@@ -64,18 +64,22 @@
 % The list of authors, and the short list which is used in the headers.
 % If you need two or more lines of authors, add an extra line using \newauthor
 \author[F. Lanusse et al.]{
-Fran\c{c}ois Lanusse,$^{1}$\thanks{E-mail: francois.lanusse@gmail.com}
-Rachel Mandelbaum,$^{1}$
-Siamak Ravanbakhsh,$^{2}$
-Ananth Tenneti,$^{1}$
+Fran\c{c}ois Lanusse,$^{1,2,3,4,5}$\thanks{E-mail: francois.lanusse@gmail.com}
+Rachel Mandelbaum,$^{5}$
+Siamak Ravanbakhsh,$^{6}$
+Ananth Tenneti,$^{5}$
 \newauthor
-Duncan Campbell,$^{1}$
-Tiziana DiMatteo,$^{1}$
-Barnabas Poczos$^{2}$
+Duncan Campbell,$^{5}$
+Tiziana DiMatteo,$^{5}$
+Barnabas Poczos$^{6}$
 \\
 % List of institutions
-$^{1}$McWilliams Center for Cosmology, Department of Physics, Carnegie Mellon University, Pittsburgh, PA 15213, USA\\
-$^{2}$School of Computer Science, Carnegie Mellon University, Pittsburgh, PA 15213, USA
+$^{1}$Berkeley Center for Cosmological Physics, University of California Berkeley, Berkeley, CA, USA\\
+$^{2}$Statistics Department, University of California Berkeley, Berkeley, CA, USA\\
+$^{3}$Lawrence Berkeley National Laboratory, Berkeley, CA, USA\\
+$^{4}$Berkeley Institute for Data Science, University of California Berkeley, Berkeley, CA, USA\\
+$^{5}$McWilliams Center for Cosmology, Department of Physics, Carnegie Mellon University, Pittsburgh, PA 15213, USA\\
+$^{6}$School of Computer Science, Carnegie Mellon University, Pittsburgh, PA 15213, USA
 }
 
 % These dates will be filled out by the publisher
@@ -141,6 +145,8 @@ to the 3D relative positions between vertices, a key ingredient to make the mode
 
 \subsubsection{Spectral graph convolutions}
 
+\fl{Rework this section, maybe some details can be dropped in view of the recent Healpix graph CNN paper}
+
 In this work, we are considering undirected and connected graphs, which can be defined as  $\mathcal{G} = (\mathcal{V} , \mathcal{E}, \mathbf{W})$, where $\mathcal{V}$ is the set of graphs vertices, with $\left\vert \mathcal{V} \right\vert = n$ the number of vertices,  $\mathcal{E}$ is the set of graph edges and $\mathbf{W} \in \mathbb{R}^{n \times  n}$ is the weighted adjacency matrix.
 
 The normalized combinatorial graph  Laplacian is defined at $\mathbf{L} = \mathbf{I} - \mathbf{D}^{-1/2} \mathbf{W} \mathbf{D}^{-1/2}$. Note that this operator is positive semi-definite and therefore  admit an eigenvalue decomposition defined as:
@@ -180,6 +186,8 @@ One can therefore define a spectral graph convolution in terms of a finite order
 	g_\theta = \sum_{k=0}^K \theta_k T_k(\Lambda)
 \end{equation}
 
+\fl{Detail how this works exactly}
+
 \subsubsection{Directional convolution kernels}
 
 The GCN introduced above uses the same isotropic convolution kernels for the entire graph. However, given the  nature of our signal, we expect the 3D positions of neighbouring galaxies to be relevant to their alignments, for instance we know that within a halo, satellites tend to align towards the central galaxy. We therefore want to design graph convolutions that have some sensitivity to the 3D orientations. 
@@ -194,6 +202,7 @@ where the  $q_m(x_i, x_j)$ are normalized so that $\sum_{m=1}^{M} q_m{x_i, x_j} 
 		q_m(x_i, x_j) = \exp(- d_m \cdot (x_j - x_i))
 \end{equation}
 
+\fl{Finish explanation of directional convolutions, and mention link to strutured gcnn}
 
 \subsection{Generative Adversarial Networks}
 
@@ -203,20 +212,21 @@ where the  $q_m(x_i, x_j)$ are normalized so that $\sum_{m=1}^{M} q_m{x_i, x_j} 
 	\item Explain  the  Gradient penalty stuff
 \end{itemize}
 
+\section{WGCGAN for IA modeling}
 
-\section{GAN on Graphs}
+In this section we describe the details of the generative model we develop specifically for the modeling of 
+intrinsic aligments.
 
-\section{Directional Graph Convolutions}
+\subsection{Graph construction}
+
+
+\subsection{Generative model architecture}
+
+
+\subsection{Training and evaluation}
+
 
 \section{Results}
-\begin{tabular}{|c|c|}
-\hline 
-1 & 2 \\ 
-\hline 
-High resolutio & 4 \\ 
-\hline 
-\end{tabular} 
-
 
 \section{Simulations}
 
@@ -225,6 +235,7 @@ High resolutio & 4 \\
 	\subsubsection{Measurement of galaxy  shapes}
 
 	\subsection{Measurement of tidal field}
+
 
 \subsection{One-point functions}
 
@@ -239,6 +250,8 @@ High resolutio & 4 \\
 	\subsection{Projected correlation functions}
 
 \subsection{Halo orientation}
+
+\fl{We could test our ability to predict host halo shapes and orientation for Duncan's model}
 
 \section{Conclusions}
 
