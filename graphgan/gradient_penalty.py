@@ -193,4 +193,4 @@ def _args_to_gan_model(loss_fn):
   new_loss_fn.__module__ = loss_fn.__module__
   return new_loss_fn
 
-my_gradient_penaly = _args_to_gan_model(custom_wasserstein_gradient_penalty)
+gradient_penaly = _args_to_gan_model(custom_wasserstein_gradient_penalty)

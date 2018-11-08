@@ -62,25 +62,20 @@ def spatial_adjacency(features,
             dr = tf.sqrt(r2)
         elif radial_weighting is 'inv_r2':
             dr = 1./(r2/s**2 + 1 )
+        elif radial_weighting is 'gate':
+            # Compute gating function that only depends on spatial features
+            gate_fn = tf.layers.dense(d, 128, activation=tf.nn.tanh)
+            gate_fn = tf.layers.dense(gate_fn, 1, activation=tf.nn.sigmoid)
+            dr = gate_fn
         else:
             raise NotImplementedError
-
-        # Apply distance scaling
-        d = d * tf.expand_dims(dr,axis=1)
-        t = tf.SparseTensor(indices=adjacency.indices,
-                            dense_shape=adjacency.dense_shape,
-                            values=dr)
-
-        # Renormalise the adjacency matrix
-        t_inv = 1./ tf.sqrt(tf.sparse_reduce_sum(t, axis=1) + 1) # The one is for self connection
-        t_inv = tf.gather(t_inv, adjacency.indices[:,0]) * tf.gather(t_inv, adjacency.indices[:,1])
 
         # Generating a list of sparse tensors as output
         q = []
         for i in range(0,filter_size):
             t = tf.SparseTensor(indices=adjacency.indices,
                                 dense_shape=adjacency.dense_shape,
-                                values=d[:,i] * t_inv)
+                                values=d[:,i] * dr)
             q.append(t)
         outputs = q
 
