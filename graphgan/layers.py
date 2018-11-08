@@ -66,7 +66,7 @@ def spatial_adjacency(features,
             # Compute gating function that only depends on spatial features
             gate_fn = tf.layers.dense(d, 128, activation=tf.nn.tanh)
             gate_fn = tf.layers.dense(gate_fn, 1, activation=tf.nn.sigmoid)
-            dr = gate_fn
+            dr = tf.reshape(gate_fn, [-1])
         else:
             raise NotImplementedError
 
