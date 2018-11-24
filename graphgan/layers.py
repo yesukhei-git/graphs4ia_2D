@@ -5,6 +5,36 @@ from tensorflow.contrib.slim import add_arg_scope, model_variable
 
 from math import sqrt
 
+
+def correlation_function(positions,
+                         orientations,
+                         adjacency):
+    """
+    Computes a proxy for the ED correlation function, and it's differentiable \o/
+    """
+    ss, n_features = positions.get_shape()
+    with tf.name_scope('correlation_function'):
+
+        # Compute unit vector
+        nd = tf.gather(positions, adjacency.indices[:,0]) - tf.gather(positions, adjacency.indices[:,1])
+        radius = tf.reduce_sum(nd**2, axis=1)
+
+        # Compute cross product with orientations
+        ed = tf.reduce_sum( ( nd * tf.gather(orientations, adjacency.indices[:,1]))**2, axis=1) / radius
+        count = tf.ones_like(ed, dtype=tf.float32)
+        # Now, to compute the ED correlation, turn this into a sparse matrix, sum over 
+        # rows/columns
+        ed_mat = tf.SparseTensor(indices=adjacency.indices,
+                                 dense_shape=adjacency.dense_shape,
+                                 values=ed)
+        count_mat = tf.SparseTensor(indices=adjacency.indices,
+                                 dense_shape=adjacency.dense_shape,
+                                 values=count)
+
+        ed_per_gal = tf.sparse.reduce_sum(ed_mat,axis=1) / tf.sparse.reduce_sum(count_mat,axis=1)
+        return ed_per_gal
+
+
 @add_arg_scope
 def spatial_adjacency(features,
                               adjacency,
