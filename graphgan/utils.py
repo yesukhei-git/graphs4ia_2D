@@ -61,3 +61,21 @@ def rand_rotation_matrix(deflection=1.0, randnums=None):
 
     M = (np.outer(V, V) - np.eye(3)).dot(R)
     return M
+
+
+def get_3d_direction():
+    # Compute Directional Kernels
+    directions = np.zeros((3, 26))
+    filter_size=26
+    ind = 0
+    for i in range(3):
+        for j in range(3):
+            for k in range(3):
+                if not (i==1 and j == 1 and k==1):
+                    directions[0,ind] = 1.0 * i - 1
+                    directions[1,ind] = 1.0 * j - 1
+                    directions[2,ind] = 1.0 * k - 1
+                    ind +=1
+    directions = directions.astype('float32')
+    directions /= np.sqrt((directions**2).sum(axis=0))
+    return directions
