@@ -22,7 +22,7 @@ def correlation_function(positions,
         # Compute cross product with orientations
         ed = tf.reduce_sum( ( nd * tf.gather(orientations, adjacency.indices[:,1]))**2, axis=1) / radius
         count = tf.ones_like(ed, dtype=tf.float32)
-        # Now, to compute the ED correlation, turn this into a sparse matrix, sum over 
+        # Now, to compute the ED correlation, turn this into a sparse matrix, sum over
         # rows/columns
         ed_mat = tf.SparseTensor(indices=adjacency.indices,
                                  dense_shape=adjacency.dense_shape,
@@ -211,20 +211,21 @@ def graph_conv2(features,
                                 regularizer=weights_regularizer,
                                 trainable=True)
 
-        b = model_variable('bias',
-                            shape=[num_outputs],
-                            initializer=biases_initializer,
-                            regularizer=biases_regularizer,
-                            trainable=True)
-
         outputs = tf.matmul(features, w0)
 
         if one_hop:
             out = tf.tensordot(features, w1, axes=[[1], [0]])
             for i in range(0, filter_size):
-                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:,:,i])
+                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
 
-        outputs += b
+        if biases_initializer is not None:
+            b = model_variable('bias',
+                                shape=[num_outputs],
+                                initializer=biases_initializer,
+                                regularizer=biases_regularizer,
+                                trainable=True)
+
+            outputs += b
 
         if activation_fn is not None:
             outputs = activation_fn(outputs)
