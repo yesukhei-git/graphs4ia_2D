@@ -5,6 +5,7 @@ from tensorflow.contrib.slim import add_arg_scope, model_variable
 
 from math import sqrt
 
+from .utils import get_3d_direction
 
 def correlation_function(positions,
                          orientations,
@@ -233,6 +234,79 @@ def graph_conv2(features,
         return slim.utils.collect_named_outputs(outputs_collections,
                                                 sc.original_name_scope,
                                                 outputs)
+
+@add_arg_scope
+def directional_graph_conv2(features,
+                adjacency,
+                num_outputs,
+                one_hop=True,
+                activation_fn=tf.nn.elu,
+                weights_initializer=slim.variance_scaling_initializer(factor=sqrt(2)),
+                weights_regularizer=None,
+                biases_initializer=tf.zeros_initializer(),
+                biases_regularizer=None,
+                reuse=None,
+                variables_collections=None,
+                outputs_collections=None,
+                trainable=True,
+                scope=None):
+    """
+    This convolution is built to take in directional features, so dim features
+    shoud be 3. Only the directions of the input vectors affect the results.
+    y = W ||D x||_2 + 1
+    where D contains a number of unit directions
+    """
+    # First step is to apply our directional "probing" matrix
+    # D is of shape (3, 26)
+    D = tf.constant(get_3d_direction())
+    features = tf.norm(tf.matmul(features, D), axis=-1)
+
+    ss, n_features = features.get_shape()
+    print(n_features) # This should be 26
+
+    if not isinstance(adjacency, list):
+        adjacency = [adjacency]
+
+    filter_size= len(adjacency)
+
+    with tf.variable_scope(scope, 'directional_graph_conv2', [features, adjacency], reuse=reuse) as sc:
+
+        w0 = model_variable('weights_0',
+                            shape=[n_features, num_outputs],
+                            initializer=weights_initializer,
+                            regularizer=weights_regularizer,
+                            trainable=True)
+
+        if one_hop:
+            w1 = model_variable('weights_1',
+                                shape=[n_features, num_outputs, filter_size],
+                                initializer=weights_initializer,
+                                regularizer=weights_regularizer,
+                                trainable=True)
+
+        outputs = tf.matmul(features, w0)
+
+        if one_hop:
+            out = tf.tensordot(features, w1, axes=[[1], [0]])
+            for i in range(0, filter_size):
+                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
+
+        if biases_initializer is not None:
+            b = model_variable('bias',
+                                shape=[num_outputs],
+                                initializer=biases_initializer,
+                                regularizer=biases_regularizer,
+                                trainable=True)
+
+            outputs += b
+
+        if activation_fn is not None:
+            outputs = activation_fn(outputs)
+
+        return slim.utils.collect_named_outputs(outputs_collections,
+                                                sc.original_name_scope,
+                                                outputs)
+
 
 @add_arg_scope
 def ar_graph_conv2( features,
