@@ -16,8 +16,9 @@ def _process_graph(args):
     x = X[g]
     y = Y[g]
     # Compute adjacency matrix for each entry
-    graph = radius_neighbors_graph(xsp, graph_radius, mode='distance',
+    graph = radius_neighbors_graph(xsp, graph_radius, mode='connectivity',
                                    include_self=False)
+
     return (xsp, x, y, graph)
 
 def graph_input_fn(catalog,
@@ -134,5 +135,82 @@ def graph_input_fn(catalog,
     dataset = tf.data.Dataset.from_generator(graph_generator,
                                output_types = graph_generator.output_types,
                                output_shapes = graph_generator.output_shapes)
+    dataset = dataset.prefetch(64)
+    return dataset
+
+def sim_input_fn(catalog,
+                   vector_features=(), scalar_features=(),
+                   vector_labels=(), scalar_labels=(),
+                   batch_size=128, shuffle=False, repeat=False,
+                   poolsize=12, balance_key='halos.m_star',
+                   rotate=False):
+    """
+    Python generator function that will create batches of graphs from
+    input catalog.
+    """
+    features = vector_features + scalar_features
+    labels = vector_labels + scalar_labels
+
+    # It takes a minute but we precompute all the graphs and data
+    # Identify the individual groups and pre-extract the relevant data
+    X = np.array(catalog[features]).view(np.float64).reshape((-1, len(features))).astype(np.float32)
+    Y = np.array(catalog[labels]).view(np.float64).reshape((-1, len(labels))).astype(np.float32)
+
+    n_batches = len(catalog) // batch_size
+    last_batch = len(catalog) % batch_size
+
+    n_features = len(vector_features) // 3
+    n_labels = len(vector_labels) // 3
+
+    if balance_key is not None:
+        # Balance probablities of graphs based on group mass
+        idx = np.arange(len(catalog))
+        p, bin = np.histogram(catalog[balance_key][idx], 16)
+        mbin = np.digitize(catalog[balance_key][idx], bin[:-1]) - 1
+        cat_probs = (1./p)[mbin]
+        cat_probs /= cat_probs.sum()
+
+    def batch_generator():
+
+        while True:
+            # Apply permutation
+            if shuffle:
+                if balance_key is not None:
+                    batch_gids = np.random.choice(len(catalog), len(catalog), p=cat_probs)
+                else:
+                    batch_gids = np.random.permutation(len(catalog))
+            else:
+                batch_gids = range(len(catalog))
+
+            for b in range(n_batches+1):
+                if b == n_batches:
+                    bs = last_batch
+                else:
+                    bs = batch_size
+
+                # Extract the elements of the batch
+                inds = batch_gids[batch_size*b:batch_size*b + bs]
+                x = X[inds]
+                y = Y[inds]
+
+                # Apply rotation of vector quantities if requested
+                if rotate:
+                    M = rand_rotation_matrix()
+                    for i in range(n_features):
+                        x[:, i*3:i*3+3] = x[:, i*3:i*3+3].dot(M.T)
+                    for i in range(n_labels):
+                        y[:, i*3:i*3+3] = y[:, i*3:i*3+3].dot(M.T)
+
+                yield x, y # {k: x[:,i] for i,k in enumerate(features)}, {k: y[:,i] for i,k in enumerate(labels)}
+
+            if not repeat:
+                break
+
+    batch_generator.output_types = (tf.float32, tf.float32)
+    batch_generator.output_shapes = ((None, len(features)), (None, len(labels)))
+
+    dataset = tf.data.Dataset.from_generator(batch_generator,
+                               output_types = batch_generator.output_types,
+                               output_shapes = batch_generator.output_shapes)
     dataset = dataset.prefetch(64)
     return dataset

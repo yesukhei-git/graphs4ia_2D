@@ -78,7 +78,7 @@ def spatial_adjacency(features,
         d = tf.gather(d, adjacency.indices[:,0]) - tf.gather(d, adjacency.indices[:,1])
 
         # Applying softmax along last dimension
-        d = tf.nn.softmax(d / tf.expand_dims(r,axis=1))
+        d = tf.nn.softmax(d / tf.expand_dims(r, axis=1))
 
         s = model_variable('scale',dtype=tf.float32,
                             initializer=tf.constant(radial_scale, dtype=tf.float32),
@@ -94,18 +94,28 @@ def spatial_adjacency(features,
             dr = 1./(r2/s**2 + 1 )
         elif radial_weighting is 'gate':
             # Compute gating function that only depends on spatial features
-            gate_fn = tf.layers.dense(d, 128, activation=tf.nn.tanh)
+            gate_fn = tf.layers.dense(tf.expand_dims(r,axis=1), 128, activation=tf.nn.tanh)
             gate_fn = tf.layers.dense(gate_fn, 1, activation=tf.nn.sigmoid)
             dr = tf.reshape(gate_fn, [-1])
         else:
             raise NotImplementedError
+
+        # Apply distance scaling
+        d = d * tf.expand_dims(dr, axis=1)
+        t = tf.SparseTensor(indices=adjacency.indices,
+                            dense_shape=adjacency.dense_shape,
+                            values=dr)
+
+        # Renormalise the adjacency matrix
+        t_inv = 1./ tf.sqrt(tf.sparse_reduce_sum(t, axis=1) + 1) # The one is for self connection
+        t_inv = tf.gather(t_inv, adjacency.indices[:,0]) * tf.gather(t_inv, adjacency.indices[:,1])
 
         # Generating a list of sparse tensors as output
         q = []
         for i in range(0,filter_size):
             t = tf.SparseTensor(indices=adjacency.indices,
                                 dense_shape=adjacency.dense_shape,
-                                values=d[:,i] * dr)
+                                values=d[:,i] * t_inv)
             q.append(t)
         outputs = q
 
