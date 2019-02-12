@@ -139,6 +139,14 @@ Our approach is to model the cosmic web as a graph, which is a natural data stru
 amongst neighbours \cite{Coutinho2016}. Given this structure, we adapt a Graph-Convolutional Network \cite{Defferrard2016} to be sensitive
 to the 3D relative positions between vertices, a key ingredient to make the model aware of the  Euclidean geometry of the problem beyond the graph connectivity. Using these layers, we subsequently implement a deep Generative Adversarial Network (GAN,  \cite{Goodfellow2014}) for signals on graphs.
 
+
+\section{Modelling challenges}
+
+	\subsection{Modelling}
+
+	\subsection{Simulations}
+
+
 \section{Deep Learning Background}
 
 \subsection{Graph Convolutional Networks}
@@ -202,7 +210,8 @@ where the  $q_m(x_i, x_j)$ are normalized so that $\sum_{m=1}^{M} q_m{x_i, x_j} 
 		q_m(x_i, x_j) = \exp(- d_m \cdot (x_j - x_i))
 \end{equation}
 
-\fl{Finish explanation of directional convolutions, and mention link to strutured gcnn}
+\fl{Finish explanation of directional convolutions, and mention link to structured gcnn}
+
 
 \subsection{Generative Adversarial Networks}
 
@@ -212,10 +221,14 @@ where the  $q_m(x_i, x_j)$ are normalized so that $\sum_{m=1}^{M} q_m{x_i, x_j} 
 	\item Explain  the  Gradient penalty stuff
 \end{itemize}
 
+
 \section{WGCGAN for IA modeling}
 
 In this section we describe the details of the generative model we develop specifically for the modeling of 
 intrinsic aligments.
+
+
+
 
 \subsection{Graph construction}
 
@@ -225,17 +238,7 @@ intrinsic aligments.
 
 \subsection{Training and evaluation}
 
-
 \section{Results}
-
-\section{Simulations}
-
-	\subsubsection{MassiveBlack-II Simulations}
-
-	\subsubsection{Measurement of galaxy  shapes}
-
-	\subsection{Measurement of tidal field}
-
 
 \subsection{One-point functions}
 
