@@ -198,9 +198,9 @@ One can therefore define a spectral graph convolution in terms of a finite order
 
 \subsubsection{Directional convolution kernels}
 
-The GCN introduced above uses the same isotropic convolution kernels for the entire graph. However, given the  nature of our signal, we expect the 3D positions of neighbouring galaxies to be relevant to their alignments, for instance we know that within a halo, satellites tend to align towards the central galaxy. We therefore want to design graph convolutions that have some sensitivity to the 3D orientations. 
+The GCN introduced above uses the same isotropic convolution kernels for the entire graph. However, given the  nature of our signal, we expect the 3D positions of neighbouring galaxies to be relevant to their alignments, for instance we know that within a halo, satellites tend to align towards the central galaxy. We therefore want to design graph convolutions that have some sensitivity to 3D orientations. 
 
-We propose to use  direction-dependent  deep neural networks.
+Based on the dynamic convolution kernels introduced in \cite{dynamic}, we propose the following direction-dependent graph convolution layer:
 \begin{equation}
 	y_i=  \mathbf{b} +  \sum\limits_{m=1}^{M} \frac{1}{|\mathcal{N}_i|} \sum_{j \in \mathcal{N}_i} q_m(x_i, x_j) \mathbf{W}_m x_j 
 \end{equation}
@@ -235,7 +235,6 @@ intrinsic aligments.
 
 \subsection{Generative model architecture}
 
-
 \subsection{Training and evaluation}
 
 \section{Results}
@@ -244,11 +243,32 @@ intrinsic aligments.
 
 	\subsubsection{Stellar mass function}
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\columnwidth]{Figures/mStar_pred}
+    \caption{Predicted stellar mass vs true stellar mass (arbitrary units for now)}
+    \label{fig:my_label}
+\end{figure}
+
 	\subsection{Galaxy shapes}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{Figures/qs_plot}
+    \caption{Mock shape parameters (left), MB2 distribution (right)}
+    \label{fig:my_label}
+\end{figure}
 
 \subsection{Two-point functions}
 
 	\subsection{3D shape correlation functions}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=\columnwidth]{Figures/ED_DM}
+        \caption{Recovery of dark matter sub-halo alignments from positions and mass only}
+        \label{fig:my_label}
+    \end{figure}
 
 	\subsection{Projected correlation functions}
 
@@ -259,7 +279,7 @@ intrinsic aligments.
 \section{Conclusions}
 
 
-The last numbered section should briefly summarise what has been done, and describe
+The last numbered section should briefly summarize what has been done, and describe
 the final conclusions which the authors draw from their work.
 
 \section*{Acknowledgements}

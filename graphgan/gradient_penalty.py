@@ -74,7 +74,7 @@ def custom_wasserstein_gradient_penalty(
     # We need to add noise to the input with proper shape, this can be done by normalising the
     # pooling matrix and multiplying by noise
     # First, extract the conditionals
-    W_1_0, W_2_0, W_3_0, xsp_0, pm_1_0,pm_2_0,pm_3_0, X, noise, Y = generator_inputs
+    W_1_0, W_2_0, W_3_0, pm_1_0,pm_2_0,pm_3_0, xsp_0, X, noise = generator_inputs
 
     # Entries normalised to one
     pool = tf.SparseTensor(tf.cast(pm_1_0, tf.int64), tf.ones_like(pm_2_0), pm_3_0)

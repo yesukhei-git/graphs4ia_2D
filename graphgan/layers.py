@@ -5,6 +5,37 @@ from tensorflow.contrib.slim import add_arg_scope, model_variable
 
 from math import sqrt
 
+from .utils import get_3d_direction
+
+def correlation_function(positions,
+                         orientations,
+                         adjacency):
+    """
+    Computes a proxy for the ED correlation function, and it's differentiable \o/
+    """
+    ss, n_features = positions.get_shape()
+    with tf.name_scope('correlation_function'):
+
+        # Compute unit vector
+        nd = tf.gather(positions, adjacency.indices[:,0]) - tf.gather(positions, adjacency.indices[:,1])
+        radius = tf.reduce_sum(nd**2, axis=1)
+
+        # Compute cross product with orientations
+        ed = tf.reduce_sum( ( nd * tf.gather(orientations, adjacency.indices[:,1]))**2, axis=1) / radius
+        count = tf.ones_like(ed, dtype=tf.float32)
+        # Now, to compute the ED correlation, turn this into a sparse matrix, sum over
+        # rows/columns
+        ed_mat = tf.SparseTensor(indices=adjacency.indices,
+                                 dense_shape=adjacency.dense_shape,
+                                 values=ed)
+        count_mat = tf.SparseTensor(indices=adjacency.indices,
+                                 dense_shape=adjacency.dense_shape,
+                                 values=count)
+
+        ed_per_gal = tf.sparse.reduce_sum(ed_mat,axis=1) / tf.sparse.reduce_sum(count_mat,axis=1)
+        return ed_per_gal
+
+
 @add_arg_scope
 def spatial_adjacency(features,
                               adjacency,
@@ -48,7 +79,7 @@ def spatial_adjacency(features,
         d = tf.gather(d, adjacency.indices[:,0]) - tf.gather(d, adjacency.indices[:,1])
 
         # Applying softmax along last dimension
-        d = tf.nn.softmax(d / tf.expand_dims(r,axis=1))
+        d = tf.nn.softmax(d / tf.expand_dims(r, axis=1))
 
         s = model_variable('scale',dtype=tf.float32,
                             initializer=tf.constant(radial_scale, dtype=tf.float32),
@@ -64,18 +95,28 @@ def spatial_adjacency(features,
             dr = 1./(r2/s**2 + 1 )
         elif radial_weighting is 'gate':
             # Compute gating function that only depends on spatial features
-            gate_fn = tf.layers.dense(d, 128, activation=tf.nn.tanh)
+            gate_fn = tf.layers.dense(tf.expand_dims(r,axis=1), 128, activation=tf.nn.tanh)
             gate_fn = tf.layers.dense(gate_fn, 1, activation=tf.nn.sigmoid)
             dr = tf.reshape(gate_fn, [-1])
         else:
             raise NotImplementedError
+
+        # Apply distance scaling
+        d = d * tf.expand_dims(dr, axis=1)
+        t = tf.SparseTensor(indices=adjacency.indices,
+                            dense_shape=adjacency.dense_shape,
+                            values=dr)
+
+        # Renormalise the adjacency matrix
+        t_inv = 1./ tf.sqrt(tf.sparse_reduce_sum(t, axis=1) + 1) # The one is for self connection
+        t_inv = tf.gather(t_inv, adjacency.indices[:,0]) * tf.gather(t_inv, adjacency.indices[:,1])
 
         # Generating a list of sparse tensors as output
         q = []
         for i in range(0,filter_size):
             t = tf.SparseTensor(indices=adjacency.indices,
                                 dense_shape=adjacency.dense_shape,
-                                values=d[:,i] * dr)
+                                values=d[:,i] * t_inv)
             q.append(t)
         outputs = q
 
@@ -181,20 +222,21 @@ def graph_conv2(features,
                                 regularizer=weights_regularizer,
                                 trainable=True)
 
-        b = model_variable('bias',
-                            shape=[num_outputs],
-                            initializer=biases_initializer,
-                            regularizer=biases_regularizer,
-                            trainable=True)
-
         outputs = tf.matmul(features, w0)
 
         if one_hop:
             out = tf.tensordot(features, w1, axes=[[1], [0]])
             for i in range(0, filter_size):
-                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:,:,i])
+                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
 
-        outputs += b
+        if biases_initializer is not None:
+            b = model_variable('bias',
+                                shape=[num_outputs],
+                                initializer=biases_initializer,
+                                regularizer=biases_regularizer,
+                                trainable=True)
+
+            outputs += b
 
         if activation_fn is not None:
             outputs = activation_fn(outputs)
@@ -202,6 +244,79 @@ def graph_conv2(features,
         return slim.utils.collect_named_outputs(outputs_collections,
                                                 sc.original_name_scope,
                                                 outputs)
+
+@add_arg_scope
+def directional_graph_conv2(features,
+                adjacency,
+                num_outputs,
+                one_hop=True,
+                activation_fn=tf.nn.elu,
+                weights_initializer=slim.variance_scaling_initializer(factor=sqrt(2)),
+                weights_regularizer=None,
+                biases_initializer=tf.zeros_initializer(),
+                biases_regularizer=None,
+                reuse=None,
+                variables_collections=None,
+                outputs_collections=None,
+                trainable=True,
+                scope=None):
+    """
+    This convolution is built to take in directional features, so dim features
+    shoud be 3. Only the directions of the input vectors affect the results.
+    y = W ||D x||_2 + 1
+    where D contains a number of unit directions
+    """
+    # First step is to apply our directional "probing" matrix
+    # D is of shape (3, 26)
+    D = tf.constant(get_3d_direction())
+    features = tf.norm(tf.matmul(features, D), axis=-1)
+
+    ss, n_features = features.get_shape()
+    print(n_features) # This should be 26
+
+    if not isinstance(adjacency, list):
+        adjacency = [adjacency]
+
+    filter_size= len(adjacency)
+
+    with tf.variable_scope(scope, 'directional_graph_conv2', [features, adjacency], reuse=reuse) as sc:
+
+        w0 = model_variable('weights_0',
+                            shape=[n_features, num_outputs],
+                            initializer=weights_initializer,
+                            regularizer=weights_regularizer,
+                            trainable=True)
+
+        if one_hop:
+            w1 = model_variable('weights_1',
+                                shape=[n_features, num_outputs, filter_size],
+                                initializer=weights_initializer,
+                                regularizer=weights_regularizer,
+                                trainable=True)
+
+        outputs = tf.matmul(features, w0)
+
+        if one_hop:
+            out = tf.tensordot(features, w1, axes=[[1], [0]])
+            for i in range(0, filter_size):
+                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
+
+        if biases_initializer is not None:
+            b = model_variable('bias',
+                                shape=[num_outputs],
+                                initializer=biases_initializer,
+                                regularizer=biases_regularizer,
+                                trainable=True)
+
+            outputs += b
+
+        if activation_fn is not None:
+            outputs = activation_fn(outputs)
+
+        return slim.utils.collect_named_outputs(outputs_collections,
+                                                sc.original_name_scope,
+                                                outputs)
+
 
 @add_arg_scope
 def ar_graph_conv2( features,
