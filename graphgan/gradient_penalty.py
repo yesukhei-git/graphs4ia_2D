@@ -1,6 +1,7 @@
-import tensorflow.contrib.gan as tfgan
+#import tensorflow.contrib.gan as tfgan
+import tensorflow_gan as tfgan
 import tensorflow as tf
-from tensorflow.contrib.framework.python.ops import variables as contrib_variables_lib
+#from tensorflow.contrib.framework.python.ops import variables as contrib_variables_lib
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import array_ops
@@ -13,10 +14,10 @@ from tensorflow.python.ops.distributions import distribution as ds
 from tensorflow.python.ops.losses import losses
 from tensorflow.python.ops.losses import util
 from tensorflow.python.summary import summary
-from tensorflow.contrib.gan.python import namedtuples
-from tensorflow.contrib.gan.python.losses.python import losses_impl
+from tensorflow_gan.python import namedtuples
+from tensorflow.python.ops.losses import losses_impl
 from tensorflow.python.util import tf_inspect
-
+from graphgan.datasets import project_ellipticities, project_3d_shape
 # We need to define a specialised gradient penalty to handle the non trivial shape of our data
 def custom_wasserstein_gradient_penalty(
     real_data,
@@ -81,11 +82,20 @@ def custom_wasserstein_gradient_penalty(
 
     batch_size = pm_3_0[0]
     alpha = random_ops.random_uniform(shape=(batch_size, 1))
-    alpha = tf.sparse_tensor_dense_matmul(pool, alpha, adjoint_a=True)
-
+    alpha = tf.compat.v1.sparse_tensor_dense_matmul(pool, alpha, adjoint_a=True)
+    
+    
+    #real_data =  project_3d_shape(real_data[...,2:5] , real_data[...,5:8], real_data[...,8:11], real_data[...,0], real_data[...,1])
+    real_data_shape = real_data.get_shape().as_list()
+    real_data = project_3d_shape(tf.expand_dims(tf.transpose(real_data[...,2:5]),axis=0) , tf.expand_dims(tf.transpose(real_data[...,5:8]),axis=0), 
+                        tf.expand_dims(tf.transpose(real_data[...,8:11]),axis=0), tf.expand_dims(tf.transpose(real_data[...,0]),axis=0), tf.expand_dims(tf.transpose(real_data[...,1]),axis=0))
+    real_data.set_shape((real_data_shape[0],2))
+ 
     differences = generated_data - real_data
     interpolates = real_data + (alpha * differences)
-
+    
+  
+    
     with ops.name_scope(None):  # Clear scope so update ops are added properly.
       # Reuse variables if variables already exists.
       with variable_scope.variable_scope(discriminator_scope, 'gpenalty_dscope',
@@ -100,7 +110,7 @@ def custom_wasserstein_gradient_penalty(
     gradients = gradients_impl.gradients(disc_interpolates, interpolates)[0]
 
     # Summing square gradients over batches and output dimension
-    gradient_squares = tf.reduce_sum(tf.sparse_tensor_dense_matmul(pool, math_ops.square(gradients)),axis=1)
+    gradient_squares = tf.reduce_sum(tf.compat.v1.sparse_tensor_dense_matmul(pool, math_ops.square(gradients)),axis=1)
 
     # Propagate shape information, if possible.
     if isinstance(batch_size, int):
@@ -119,7 +129,7 @@ def custom_wasserstein_gradient_penalty(
 
     if add_summaries:
       summary.scalar('gradient_penalty_loss', penalty)
-
+    print(penalty)
     return penalty
 
 def _args_to_gan_model(loss_fn):

@@ -5,6 +5,95 @@ import scipy.sparse as sp
 from multiprocessing import Pool
 from sklearn.neighbors import radius_neighbors_graph
 from .utils import sparse_to_tuple, rand_rotation_matrix
+ 
+
+def project_ellipticities(i, data):
+
+    a3d = np.array([[data['dm_av_x'][i], data['dm_av_y'][i], data['dm_av_z'][i]]])
+    b3d = np.array([[data['dm_bv_x'][i], data['dm_bv_y'][i], data['dm_bv_z'][i]]])
+    c3d = np.array([[data['dm_cv_x'][i], data['dm_cv_y'][i], data['dm_cv_z'][i]]])
+    q3d = np.array([data['dm_b'][i]/data['dm_a'][i]])
+    s3d = np.array([data['dm_c'][i]/data['dm_a'][i]])
+
+
+    e12 = project_3d_shape(a3d, b3d, c3d, q3d, s3d)
+
+    return e12
+
+def project_ellipticities_np(i, data):
+
+    a3d = np.array([[data['dm_av_x'][i], data['dm_av_y'][i], data['dm_av_z'][i]]])
+    b3d = np.array([[data['dm_bv_x'][i], data['dm_bv_y'][i], data['dm_bv_z'][i]]])
+    c3d = np.array([[data['dm_cv_x'][i], data['dm_cv_y'][i], data['dm_cv_z'][i]]])
+    q3d = np.array([data['dm_b'][i]/data['dm_a'][i]])
+    s3d = np.array([data['dm_c'][i]/data['dm_a'][i]])
+
+
+    e12 = project_3d_shape_np(a3d, b3d, c3d, q3d, s3d)
+
+    return e12
+
+# def project_3d_shape(a3d, b3d, c3d, q3d, s3d):
+ 
+ 
+#     s = tf.stack([a3d, b3d, c3d])
+#     w = tf.stack([tf.ones_like(q3d), q3d, s3d])
+ 
+
+#     k = tf.reduce_sum(s[:,:,0:2]*tf.expand_dims(s[:,:,2], axis=-1) / tf.expand_dims(w[:,:]**2, axis=-1), axis=0)
+#     a2 =tf.reduce_sum(s[:,:,2]**2/w[:,:]**2, axis=0)
+ 
+#     Winv = tf.reduce_sum(tf.einsum('ijk,ijl->ijkl', s[:,:,0:2], s[:,:,0:2]) / tf.expand_dims(tf.expand_dims(w[:,:]**2,-1),-1), axis=0) - tf.einsum('ij,ik->ijk', k,k)/tf.expand_dims(tf.expand_dims(a2,-1),-1)
+    
+#     W = tf.linalg.inv(Winv )
+#     d = tf.sqrt(tf.linalg.det(W))
+ 
+#     e1 = (W[:,0,0] - W[:,1,1])/( W[:,0,0] + W[:,1,1] + 2*d)
+#     e2 = 2 * W[:,0,1]/( W[:,0,0] + W[:,1,1] + 2*d)
+ 
+#     return tf.stack([e1, e2], axis=-1)
+
+def project_3d_shape(a3d, b3d, c3d, q3d, s3d):
+ 
+ 
+    s = tf.stack([a3d, b3d, c3d])
+    #print('Look it: ',s.get_shape().as_list())
+    w = tf.stack([tf.ones_like(q3d), q3d, s3d])
+ 
+
+    k = tf.reduce_sum(s[:,:,0:2]*tf.expand_dims(s[:,:,2], axis=-2) / tf.expand_dims(w[:,:]**2, axis=-2), axis=0)
+    a2 =tf.reduce_sum(s[:,:,2]**2/w[:,:]**2, axis=0)
+    #print('Look it: ',s[:,:,0:2,...].get_shape().as_list())
+    
+    Winv = tf.reduce_sum(tf.einsum('ijko,ijlo->ijklo', s[:,:,0:2,...], s[:,:,0:2,...]) / tf.expand_dims(tf.expand_dims(w[:,:]**2,-2),-2), axis=0) - tf.einsum('ijo,iko->ijko', k,k)/tf.expand_dims(tf.expand_dims(a2,-2),-2)
+    W = tf.linalg.inv(tf.squeeze( tf.transpose(Winv) ))
+    d = tf.sqrt(tf.linalg.det(W))
+ 
+    e1 = (W[:,0,0] - W[:,1,1])/( W[:,0,0] + W[:,1,1] + 2*d)
+    e2 = 2 * W[:,0,1]/( W[:,0,0] + W[:,1,1] + 2*d)
+    #print('Got to return')
+    return tf.stack([e1, e2], axis=-1)
+
+def project_3d_shape_np(a3d, b3d, c3d, q3d, s3d):
+ 
+ 
+    s = np.stack([a3d, b3d, c3d])
+    w = np.stack([np.ones_like(q3d), q3d, s3d])
+ 
+
+    k = np.sum(s[:,:,0:2]*np.expand_dims(s[:,:,2], axis=-1) / np.expand_dims(w[:,:]**2, axis=-1), axis=0)
+    a2 =np.sum(s[:,:,2]**2/w[:,:]**2, axis=0)
+     
+    Winv = np.sum(np.einsum('ijk,ijl->ijkl', s[:,:,0:2], s[:,:,0:2]) / np.expand_dims(np.expand_dims(w[:,:]**2,-1),-1), axis=0) - np.einsum('ij,ik->ijk', k,k)/np.expand_dims(np.expand_dims(a2,-1),-1)
+    print(Winv.shape)
+    W = np.linalg.inv(Winv )
+    d = np.sqrt(np.linalg.det(W))
+ 
+    e1 = (W[:,0,0] - W[:,1,1])/( W[:,0,0] + W[:,1,1] + 2*d)
+    e2 = 2 * W[:,0,1]/( W[:,0,0] + W[:,1,1] + 2*d)
+ 
+    return np.stack([e1, e2], axis=-1)
+
 
 def _process_graph(args):
     """
@@ -24,16 +113,17 @@ def _process_graph(args):
 def graph_input_fn(catalog,
                    vector_features=(), scalar_features=(),
                    vector_labels=(), scalar_labels=(),
-                   pos_key=['halos.x', 'halos.y', 'halos.z'],
-                   group_key='groups.groupId', batch_size=128,
+                   pos_key=['gal_pos_x', 'gal_pos_y', 'gal_pos_z'],
+                   group_key='GroupID', batch_size=128,
                    noise_size=32,
                    graph_radius=1000., shuffle=False, repeat=False,
-                   prefetch=100, poolsize=12, balance_key='groups.mass_scaled',
+                   prefetch=100, poolsize=12, balance_key='group_mass_scaled',
                    rotate=False):
     """
     Python generator function that will create batches of graphs from
     input catalog.
     """
+    
     features = vector_features + scalar_features
     labels = vector_labels + scalar_labels
 
@@ -41,12 +131,16 @@ def graph_input_fn(catalog,
     # Identify the individual groups and pre-extract the relevant data
     group_ids = catalog[group_key]
     gids, idx = np.unique(group_ids, return_index=True)
-
+ 
     # Extracts columns of interest into memory first
     Xsp = np.array(catalog[pos_key]).view(np.float64).reshape((-1, 3)).astype(np.float32)
     X = np.array(catalog[features]).view(np.float64).reshape((-1, len(features))).astype(np.float32)
     Y = np.array(catalog[labels]).view(np.float64).reshape((-1, len(labels))).astype(np.float32)
-
+    #nan_mask = (~np.isnan(Xsp).any(axis=1)) & (~np.isnan(X).any(axis=1)) & (~np.isnan(Y).any(axis=1))
+    Xsp = Xsp[ (~np.isnan(Xsp).any(axis=1))]
+    X = X[(~np.isnan(X).any(axis=1))]
+    Y = Y[(~np.isnan(Y).any(axis=1))]
+ 
     n_batches = len(gids) // batch_size
     last_batch = len(gids) % batch_size
 
@@ -69,6 +163,9 @@ def graph_input_fn(catalog,
 
         while True:
             # Apply permutation
+            #shuffling matters for training and we want to use shuffled data for training.
+            #not for the testing 
+            
             if shuffle:
                 if balance_key is not None:
                     batch_gids = np.random.choice(len(gids), len(gids), p=cat_probs)
@@ -99,10 +196,19 @@ def graph_input_fn(catalog,
                     M = rand_rotation_matrix()
                     xsp = xsp.dot(M.T)
                     for i in range(n_features):
+                       # print(i)
                         x[:, i*3:i*3+3] = x[:, i*3:i*3+3].dot(M.T)
+                       # print(x[:, i*3:i*3+3])
                     for i in range(n_labels):
+                        #print(i)
                         y[:, i*3:i*3+3] = y[:, i*3:i*3+3].dot(M.T)
-
+                        #print(y[:, i*3:i*3+3])
+                    #for j in each_gal:
+                        #e1,e2= somefunction_2d(y[j])
+#                 print(x.shape)
+                    #print(y.shape)
+#                 print(x)
+#                 print(y)
                 # Block adjacency matrix for the batch
                 W = sp.block_diag(graphs)
 
@@ -126,12 +232,13 @@ def graph_input_fn(catalog,
                                      tf.int32, tf.float32, tf.int64,
                                      tf.float32, tf.float32, tf.float32),
                                     tf.float32)
+     
     graph_generator.output_shapes = (((None, 2), (None,), (2,),
                                       (None, 2), (None,), (2,),
                                       (None, 3), (None, len(features)),
                                       (None, noise_size)),
                                      (None, len(labels)))
-
+     
     dataset = tf.data.Dataset.from_generator(graph_generator,
                                output_types = graph_generator.output_types,
                                output_shapes = graph_generator.output_shapes)
@@ -142,7 +249,7 @@ def sim_input_fn(catalog,
                    vector_features=(), scalar_features=(),
                    vector_labels=(), scalar_labels=(),
                    batch_size=128, shuffle=False, repeat=False,
-                   poolsize=12, balance_key='halos.m_star',
+                   poolsize=12, balance_key='mass',
                    rotate=False):
     """
     Python generator function that will create batches of graphs from

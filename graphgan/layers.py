@@ -1,7 +1,8 @@
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-from tensorflow.contrib import layers
-from tensorflow.contrib.slim import add_arg_scope, model_variable
+#import tensorflow.contrib.slim as slim
+import tf_slim as slim
+from keras import layers
+from tf_slim import add_arg_scope, model_variable
 
 from math import sqrt
 
@@ -66,7 +67,7 @@ def spatial_adjacency(features,
         - 'inv_r2': w(r) = 1/((r/scale)**2 +1 )
     """
     ss, n_features = features.get_shape()
-    with tf.variable_scope(scope, 'spatial_adjacency',
+    with tf.compat.v1.variable_scope(scope, 'spatial_adjacency',
                            [features, adjacency, directions], reuse=reuse) as sc:
 
         # Compute radial distance
@@ -95,8 +96,8 @@ def spatial_adjacency(features,
             dr = 1./(r2/s**2 + 1 )
         elif radial_weighting is 'gate':
             # Compute gating function that only depends on spatial features
-            gate_fn = tf.layers.dense(tf.expand_dims(r,axis=1), 128, activation=tf.nn.tanh)
-            gate_fn = tf.layers.dense(gate_fn, 1, activation=tf.nn.sigmoid)
+            gate_fn = layers.Dense(tf.expand_dims(r,axis=1), 128, activation=tf.nn.tanh)
+            gate_fn = layers.Dense(gate_fn, 1, activation=tf.nn.sigmoid)
             dr = tf.reshape(gate_fn, [-1])
         else:
             raise NotImplementedError
@@ -108,7 +109,7 @@ def spatial_adjacency(features,
                             values=dr)
 
         # Renormalise the adjacency matrix
-        t_inv = 1./ tf.sqrt(tf.sparse_reduce_sum(t, axis=1) + 1) # The one is for self connection
+        t_inv = 1./ tf.sqrt(tf.compat.v1.sparse_reduce_sum(t, axis=1) + 1) # The one is for self connection
         t_inv = tf.gather(t_inv, adjacency.indices[:,0]) * tf.gather(t_inv, adjacency.indices[:,1])
 
         # Generating a list of sparse tensors as output
@@ -207,7 +208,7 @@ def graph_conv2(features,
 
     filter_size= len(adjacency)
 
-    with tf.variable_scope(scope, 'graph_conv2', [features, adjacency], reuse=reuse) as sc:
+    with tf.compat.v1.variable_scope(scope, 'graph_conv2', [features, adjacency], reuse=reuse) as sc:
 
         w0 = model_variable('weights_0',
                             shape=[n_features, num_outputs],
@@ -227,7 +228,7 @@ def graph_conv2(features,
         if one_hop:
             out = tf.tensordot(features, w1, axes=[[1], [0]])
             for i in range(0, filter_size):
-                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
+                outputs += tf.compat.v1.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
 
         if biases_initializer is not None:
             b = model_variable('bias',
@@ -279,7 +280,7 @@ def directional_graph_conv2(features,
 
     filter_size= len(adjacency)
 
-    with tf.variable_scope(scope, 'directional_graph_conv2', [features, adjacency], reuse=reuse) as sc:
+    with tf.compat.v1.variable_scope(scope, 'directional_graph_conv2', [features, adjacency], reuse=reuse) as sc:
 
         w0 = model_variable('weights_0',
                             shape=[n_features, num_outputs],
@@ -299,7 +300,7 @@ def directional_graph_conv2(features,
         if one_hop:
             out = tf.tensordot(features, w1, axes=[[1], [0]])
             for i in range(0, filter_size):
-                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
+                outputs += tf.compat.v1.sparse_tensor_dense_matmul(adjacency[i], out[:, :, i])
 
         if biases_initializer is not None:
             b = model_variable('bias',
@@ -347,7 +348,7 @@ def ar_graph_conv2( features,
 
     filter_size= len(adjacency)
 
-    with tf.variable_scope(scope, 'ar_graph_conv2', [features, adjacency], reuse=reuse) as sc:
+    with tf.compat.v1.variable_scope(scope, 'ar_graph_conv2', [features, adjacency], reuse=reuse) as sc:
 
         w0 = model_variable('weights_0',
                         shape=[n_features, num_outputs],
@@ -390,7 +391,7 @@ def ar_graph_conv2( features,
         if one_hop:
             out = tf.tensordot(features, w1, axes=[[1], [0]])
             for i in range(filter_size):
-                outputs += tf.sparse_tensor_dense_matmul(adjacency[i], out[:,:,i])
+                outputs += tf.compat.v1.sparse_tensor_dense_matmul(adjacency[i], out[:,:,i])
 
         outputs += b
 
@@ -415,7 +416,7 @@ def ar_graph_bottleneck2(inputs,
     ss, n_features = inputs.get_shape()
     num_inputs_per_channel = tf.cast(n_features / n_channels, tf.int32)
 
-    with tf.variable_scope(scope, 'ar_graph_bottleneck2', [inputs, adjacency]) as sc:
+    with tf.compat.v1.variable_scope(scope, 'ar_graph_bottleneck2', [inputs, adjacency]) as sc:
 
         #preact = layers.batch_norm(inputs, activation_fn=activation_fn, scope='preact')
         preact = inputs
@@ -463,7 +464,7 @@ def graph_bottleneck2(inputs,
     """
     ss, n_features = inputs.get_shape()
 
-    with tf.variable_scope(scope, 'graph_bottleneck2', [inputs, adjacency]) as sc:
+    with tf.compat.v1.variable_scope(scope, 'graph_bottleneck2', [inputs, adjacency]) as sc:
 
         #preact = layers.batch_norm(inputs, activation_fn=activation_fn, scope='preact')
         preact = inputs
@@ -506,7 +507,7 @@ def graph_bottleneck(inputs,
     """
     Bottleneck residual unit variant
     """
-    with tf.variable_scope(scope, 'graph_bottleneck', [inputs, adjacency]) as sc:
+    with tf.compat.v1.variable_scope(scope, 'graph_bottleneck', [inputs, adjacency]) as sc:
 
         if depth == depth_in:
             shortcut = inputs
@@ -537,7 +538,7 @@ def ar_graph_bottleneck( inputs,
     ss, n_features = inputs.get_shape()
     num_inputs_per_channel = tf.cast(n_features / n_channels, tf.int32)
 
-    with tf.variable_scope(scope, 'ar_graph_bottleneck', [inputs, adjacency]) as sc:
+    with tf.compat.v1.variable_scope(scope, 'ar_graph_bottleneck', [inputs, adjacency]) as sc:
 
         #preact = layers.batch_norm(inputs, activation_fn=activation_fn, scope='preact')
         preact = inputs
@@ -599,7 +600,7 @@ def ar_graph_conv( features,
     num_outputs = num_outputs_per_channel * n_channels
     num_inputs_per_channel = tf.cast(n_features / n_channels, tf.int32)
 
-    with tf.variable_scope(scope, 'graph_conv', [features, adjacency], reuse=reuse) as sc:
+    with tf.compat.v1.variable_scope(scope, 'graph_conv', [features, adjacency], reuse=reuse) as sc:
 
         if zero_hop:
             w0 = model_variable('weights_0',
@@ -675,7 +676,7 @@ def graph_conv( features,
     """
     ss, n_features = features.get_shape()
 
-    with tf.variable_scope(scope, 'graph_conv', [features, adjacency], reuse=reuse) as sc:
+    with tf.compat.v1.variable_scope(scope, 'graph_conv', [features, adjacency], reuse=reuse) as sc:
 
         if not masked:
             w0 = model_variable('weights_0',
@@ -700,7 +701,7 @@ def graph_conv( features,
             features = tf.nn.dropout(features, keep_prob=dropout)
 
         outputs = tf.matmul(features, w1)
-        outputs = tf.sparse_tensor_dense_matmul(adjacency, outputs)
+        outputs = tf.compat.v1.sparse_tensor_dense_matmul(adjacency, outputs)
 
         if not masked:
             outputs = 0.5*outputs + 0.5*tf.matmul(features, w0)
